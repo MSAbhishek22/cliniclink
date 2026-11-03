@@ -1,0 +1,3 @@
+# ClinicLink is Python standard library only — no dependencies to install.
+# This file exists so Render's Python build step has an explicit, empty
+# requirements file. No secrets, no keys, no paid services.

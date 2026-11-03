@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClinicLink — demo (synthetic data only)</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;margin:0;color:#1a1a1a;background:#f6f5f1;line-height:1.45}
+header{background:#123c2e;color:#fff;padding:1em 1em .8em}
+header h1{margin:0 0 .2em;font-size:1.35em}
+header p{margin:.2em 0}
+.badge{display:inline-block;background:#ffd23f;color:#1a1a1a;font-weight:700;font-size:.8em;padding:.2em .6em;border-radius:999px}
+.wrap{max-width:760px;margin:0 auto;padding:0 1em 2em}
+.story{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.9em;margin:1em 0}
+.story ol{margin:.4em 0 .2em;padding-left:1.2em}
+.story li{margin:.3em 0}
+.story strong{color:#123c2e}
+.tabs{display:flex;gap:.5em;margin:1em 0}
+.tabs button{flex:1;padding:.8em;border:2px solid #123c2e;border-radius:10px;background:#fff;font-size:1em;font-weight:700;cursor:pointer}
+.tabs button[aria-selected="true"]{background:#123c2e;color:#fff}
+.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:1em;margin:1em 0}
+.card h2{margin-top:0;font-size:1.1em}
+label{display:block;margin:.6em 0 .25em;font-weight:600}
+input,select,textarea{width:100%;padding:.7em;font-size:1em;border:1px solid #aaa;border-radius:8px}
+button{padding:.7em 1em;margin-top:.8em;font-size:1em;border-radius:8px;border:1px solid #123c2e;background:#123c2e;color:#fff;cursor:pointer}
+button.secondary{background:#fff;color:#123c2e}
+button.danger{background:#a00;border-color:#a00}
+.steps{display:flex;gap:.4em;flex-wrap:wrap;margin:.5em 0}
+.step{flex:1;min-width:110px;text-align:center;padding:.5em;border-radius:8px;background:#eee;font-size:.9em}
+.step.active{background:#ffd23f;font-weight:700}
+.step.done{background:#d8ead9}
+.escalation-banner{display:none;background:#a00;color:#fff;border-radius:10px;padding:1em;margin:1em 0}
+.escalation-banner.show{display:block}
+.escalation-banner h2{margin:0 0 .3em}
+.escalation-banner p{margin:.2em 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6em}
+.stat{background:#eef3ef;border-radius:10px;padding:.8em;text-align:center}
+.stat b{font-size:1.6em;display:block}
+.visit{border:1px solid #ddd;border-radius:10px;padding:.8em;margin:.6em 0;background:#fff}
+.visit.escalated{border-color:#a00;border-width:2px}
+.pill{display:inline-block;font-size:.8em;font-weight:700;padding:.15em .6em;border-radius:999px;background:#eee}
+.pill.escalate{background:#a00;color:#fff}
+.pill.routine{background:#d8ead9}
+.muted{color:#555;font-size:.9em}
+footer{margin-top:1.5em;font-size:.9em;color:#444}
+@media(max-width:480px){.stats{grid-template-columns:1fr 1fr 1fr}.stat b{font-size:1.3em}header h1{font-size:1.15em}}
+</style>
+</head>
+<body>
+<header>
+<div class="wrap" style="padding:0">
+<h1>ClinicLink</h1>
+<p><span class="badge">SYNTHETIC DATA ONLY</span> — no real patient data, ever.</p>
+<p><strong>Evening transcription → minute-in escalation.</strong> A worker files from the field; the clinic laptop sees it the same minute. A danger-sign tick becomes an unmissable escalation banner — not a diagnosis, not treatment advice.</p>
+</div>
+</header>
+<div class="wrap">
+
+<div class="story">
+<strong>The specific gap — not just a form.</strong>
+<ol>
+<li><strong>Morning, in the field:</strong> the worker files the visit on her phone, right after seeing the household.</li>
+<li><strong>Same minute, on the clinic laptop:</strong> the report appears on the dashboard — no evening re-typing, no second copy, no transcription step where errors creep in.</li>
+<li><strong>Danger sign ticked?</strong> The clinic gets a red <em>escalate per protocol</em> banner it cannot miss, and follows its own protocol.</li>
+</ol>
+<p class="muted">Differentiator: offline-first, laptop-as-host, approval-pairing. Records stay on the clinic laptop (local SQLite, no central cloud, no subscription) — the phone is the controller, the laptop is the host.</p>
+</div>
+
+<div class="tabs" role="tablist">
+<button id="tabPhone" aria-selected="true" onclick="switchView('phone')">📱 Phone — file from the field</button>
+<button id="tabClinic" aria-selected="false" onclick="switchView('clinic')">💻 Clinic laptop — dashboard</button>
+</div>
+
+<div id="escalationBanner" class="escalation-banner" role="alert">
+<h2>⚠ ESCALATE PER PROTOCOL</h2>
+<p id="escalationText">A danger sign was ticked. Follow the clinic's own protocol.</p>
+<p class="muted" style="color:#fff">This is never a diagnosis and never treatment advice. Free-text notes never create this banner — only a checklist tick does.</p>
+</div>
+
+<!-- PHONE VIEW -->
+<section id="phoneView">
+<div class="card">
+<h2>1. Pair the phone — clinic approval required</h2>
+<div class="steps" id="pairSteps">
+<span class="step active" id="stepRequest">1 · Request</span>
+<span class="step" id="stepApprove">2 · Approve</span>
+<span class="step" id="stepPaired">3 · Paired ✓</span>
+</div>
+<p class="muted">Nothing files before a human on the clinic side approves. Any token can be revoked instantly.</p>
+<label>Device id <input id="device" value="DEMO-PHONE-01"></label>
+<button onclick="pairRequest()">Request pairing</button>
+<label>Approval code <input id="code" placeholder="6-digit code from step 1"></label>
+<button onclick="pairApprove()">Approve with code</button>
+<button class="secondary" onclick="revokePairing()">Revoke pairing</button>
+<p id="pairStatus">Not paired yet. Request pairing first.</p>
+</div>
+
+<div class="card">
+<h2>2. File a visit report — from the field</h2>
+<p><span class="badge">SYNTHETIC DATA ONLY</span></p>
+<label>Worker id <input id="worker" value="DEMO-WORKER-01"></label>
+<label>Household <input id="household" value="Synthetic Household 12"></label>
+<label>Visit type
+<select id="vtype">
+<option value="pregnancy">Pregnancy</option>
+<option value="newborn">Newborn</option>
+<option value="general">General</option>
+<option value="follow_up">Follow-up</option>
+<option value="immunisation_reminder">Immunisation reminder</option>
+</select></label>
+<label>Note <textarea id="note" rows="3">Routine check-in, synthetic demo.</textarea></label>
+<div id="signs"></div>
+<button onclick="fileVisit()">File report</button>
+<button class="secondary" onclick="seed()">Load synthetic demo records</button>
+<p id="fileStatus"></p>
+</div>
+</section>
+
+<!-- CLINIC VIEW -->
+<section id="clinicView" hidden>
+<div class="card">
+<h2>Clinic laptop — today's summary</h2>
+<p class="muted">Host: clinic laptop · Storage: local SQLite · No central cloud · No subscription · <span class="badge">SYNTHETIC DATA ONLY</span></p>
+<div class="stats">
+<div class="stat"><b id="statVisits">–</b>visits filed today</div>
+<div class="stat"><b id="statEsc">–</b>escalations flagged</div>
+<div class="stat"><b id="statHouse">–</b>households seen today</div>
+</div>
+<button onclick="refresh()">Refresh summary + visits</button>
+<button class="secondary" onclick="seed()">Load synthetic demo records</button>
+<h3>Today's visits (newest first)</h3>
+<div id="visitList"><p class="muted">Press refresh.</p></div>
+<pre id="out" class="muted" style="white-space:pre-wrap;display:none"></pre>
+</div>
+</section>
+
+<footer>
+<p><strong>Synthetic data only.</strong> Danger signs produce one output only: <em>escalate per protocol</em>. This demo never diagnoses and never gives treatment advice. Records live on the clinic laptop, not a central health cloud. Pairing in this prototype is modelled with HMAC tokens — real Ed25519 device keys are a documented next step, not a claim made here.</p>
+<p>Run locally: <code>python3 server.py</code> → http://127.0.0.1:8000 · Deploy path (not done): Render free tier via <code>render.yaml</code> — no card, Cloud Run is out.</p>
+</footer>
+</div>
+
+<script>
+let token = "";
+const SIGNS = {
+  pregnancy: ["heavy_bleeding","severe_headache_or_blurred_vision","fever","convulsions","reduced_fetal_movement","swelling_face_or_hands"],
+  newborn: ["difficulty_breathing","fever_or_low_temperature","poor_feeding","umbilical_redness_or_discharge","jaundice","unusual_sleepiness_or_lethargy"],
+  general: ["high_fever_more_than_3_days","difficulty_breathing","signs_of_dehydration","persistent_vomiting","severe_weakness_or_fainting"]
+};
+function switchView(which){
+  document.getElementById("phoneView").hidden = which !== "phone";
+  document.getElementById("clinicView").hidden = which !== "clinic";
+  document.getElementById("tabPhone").setAttribute("aria-selected", which === "phone");
+  document.getElementById("tabClinic").setAttribute("aria-selected", which === "clinic");
+  if (which === "clinic") refresh();
+}
+function setStep(n){
+  ["stepRequest","stepApprove","stepPaired"].forEach((id,i)=>{
+    const el = document.getElementById(id);
+    el.className = "step" + (i+1 < n ? " done" : i+1 === n ? " active" : "");
+  });
+}
+function showBanner(text){
+  document.getElementById("escalationText").textContent = text;
+  document.getElementById("escalationBanner").classList.add("show");
+}
+function hideBanner(){ document.getElementById("escalationBanner").classList.remove("show"); }
+function renderSigns(){
+  const t = document.getElementById("vtype").value;
+  const list = (t === "pregnancy" ? SIGNS.pregnancy : t === "newborn" ? SIGNS.newborn : SIGNS.general);
+  document.getElementById("signs").innerHTML = "<label>Danger-sign checklist (tick only what was seen / reported):</label>" +
+    list.map(s => `<label><input type="checkbox" class="sign" value="${s}"> ${s.replaceAll("_"," ")}</label>`).join("");
+}
+document.getElementById("vtype").onchange = renderSigns; renderSigns();
+async function post(path, body, auth){
+  const h = {"Content-Type":"application/json"};
+  if (auth) h["X-Pairing-Token"] = token;
+  const r = await fetch(path, {method:"POST", headers:h, body:JSON.stringify(body)});
+  return {status:r.status, data:await r.json()};
+}
+async function pairRequest(){
+  const r = await post("/api/pair/request", {device_id: document.getElementById("device").value});
+  document.getElementById("pairStatus").textContent = "Approval code (clinic side approves this): " + (r.data.approval_code || JSON.stringify(r.data));
+  if (r.data.approval_code) { document.getElementById("code").value = r.data.approval_code; setStep(2); }
+}
+async function pairApprove(){
+  const r = await post("/api/pair/approve", {device_id: document.getElementById("device").value, approval_code: document.getElementById("code").value});
+  token = r.data.pairing_token || "";
+  if (token) { document.getElementById("pairStatus").textContent = "Paired ✓. You can now file reports."; setStep(3); }
+  else document.getElementById("pairStatus").textContent = "Approval failed: " + JSON.stringify(r.data);
+}
+async function revokePairing(){
+  if (!token) { document.getElementById("pairStatus").textContent = "Nothing paired to revoke."; return; }
+  const r = await post("/api/pair/revoke", {pairing_token: token});
+  token = "";
+  document.getElementById("pairStatus").textContent = r.data.revoked ? "Pairing revoked. Filing is blocked until a new approval." : "Revoke failed.";
+  setStep(1);
+}
+async function fileVisit(){
+  const signs = [...document.querySelectorAll(".sign:checked")].map(e => e.value);
+  const r = await post("/api/visits", {worker_id: document.getElementById("worker").value,
+    household: document.getElementById("household").value, visit_type: document.getElementById("vtype").value,
+    note: document.getElementById("note").value, danger_signs: signs}, true);
+  const el = document.getElementById("fileStatus");
+  if (r.status === 201) {
+    const esc = r.data.escalation === "escalate_per_protocol";
+    el.innerHTML = "Filed (SYNTHETIC DATA). Escalation: <strong>" + r.data.escalation + "</strong> (never a diagnosis — follow clinic protocol).";
+    if (esc) showBanner("Escalation flagged for " + r.data.household + " — danger sign ticked: " + (r.data.danger_signs||[]).join(", ") + ". Follow the clinic's own protocol.");
+    refresh();
+  } else el.textContent = "Failed (" + r.status + "): " + JSON.stringify(r.data);
+}
+async function seed(){ const r = await post("/api/seed", {}); document.getElementById("fileStatus").textContent = "Seeded " + r.data.seeded + " synthetic records."; refresh(); }
+function escLabel(s){ return s.replaceAll("_"," "); }
+async function refresh(){
+  const s = await (await fetch("/api/summary")).json();
+  const v = await (await fetch("/api/visits")).json();
+  document.getElementById("statVisits").textContent = s.visits_filed_today;
+  document.getElementById("statEsc").textContent = s.escalations_flagged;
+  document.getElementById("statHouse").textContent = (s.households_seen_today||[]).length;
+  if ((s.escalated_visits||[]).length) showBanner("Today's escalations: " + s.escalated_visits.map(x => x.household + " (" + (x.danger_signs||[]).join(", ") + ")").join(" · ") + " — follow clinic protocol.");
+  const list = document.getElementById("visitList");
+  list.innerHTML = (v.visits||[]).map(x => `<div class="visit ${x.escalation === "escalate_per_protocol" ? "escalated" : ""}">
+    <strong>${x.household}</strong> · ${x.visit_type} · <span class="pill ${x.escalation === "escalate_per_protocol" ? "escalate" : "routine"}">${escLabel(x.escalation)}</span>
+    <span class="pill">SYNTHETIC</span><br>
+    <span class="muted">Worker ${x.worker_id} · ${x.note || ""}</span><br>
+    <span class="muted">Danger signs: ${(x.danger_signs||[]).length ? x.danger_signs.join(", ") : "none ticked"}</span>
+  </div>`).join("") || "<p class='muted'>No visits yet today.</p>";
+  document.getElementById("out").textContent = JSON.stringify({summary: s, visits: v.visits}, null, 2);
+}
+</script>
+</body>
+</html>

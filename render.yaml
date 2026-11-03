@@ -1,0 +1,21 @@
+# ClinicLink — Render free-tier deploy config (ON PAPER ONLY — NOT deployed).
+# The user deploys this himself (see SUBMISSION_CHECKLIST.md). Stop at once
+# if Render asks for a card: free tier must stay free.
+# Free-tier caveats, stated for judges: services sleep after ~15 min idle,
+# expect a ~60s cold start; state is local SQLite on an ephemeral disk,
+# deliberately NOT managed Postgres (free Postgres expires after 30 days),
+# so demo state resets on restart/redeploy. That is intentional for a
+# synthetic demo — no real patient data ever lives here.
+# Server binds 0.0.0.0 and reads $PORT (Render supplies it); locally it
+# falls back to CLINICLINK_PORT or 8000. See server.py main().
+services:
+  - type: web
+    name: cliniclink-demo
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt || echo 'stdlib only — nothing to install'"
+    startCommand: "python3 server.py"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
