@@ -84,12 +84,12 @@ pitch — not "visit reporting", which any form can do.
   user's remaining step — see AGENTFOUNDRY_IMPORT_GUIDE.md and
   SUBMISSION_CHECKLIST.md. This build does not claim to already be
   "built in AgentFoundry".
-- **Not deployed yet.** The Render config in `render.yaml` is on paper
-  only, now verified for free-tier shape (plan: free, `python3
-  server.py`, `/health` health check, stdlib-only
-  `requirements.txt`, `$PORT` handling in `server.py`). There is no
-  live URL until the user deploys it himself, and no live link is
-  claimed anywhere in this repo.
+- **Deployed (Vercel Hobby, no card).** Live demo: https://cliniclink.vercel.app
+  — deployed 12 Nov 2026 on Vercel Hobby, after Render's free tier asked for a
+  card at deploy time. The Render config in `render.yaml` is the alternative
+  host (verified for free-tier shape: plan free, `python3 server.py`,
+  `/health` health check, stdlib-only `requirements.txt`, `$PORT` handling
+  in `server.py`). Vercel functions are ephemeral; SQLite lives in /tmp and filed visits are visible only while an instance stays warm — a fresh instance starts empty.
 - **Separate module, not Abhiverse itself.** This repo is the entry that
   would be released open-source (MIT) to the Code for India org with
   attribution, per the hackathon's IP terms. Abhiverse itself stays in
