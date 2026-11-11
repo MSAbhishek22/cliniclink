@@ -2,7 +2,7 @@
 
 **Code for a Billion — Bharat Agentic-AI Hackathon 2026 · Impact area: Health
 (frontline health workers) · Entry status: PROTOTYPE REFINED + DEMO-READY,
-NOT SUBMITTED, NOT DEPLOYED**
+NOT SUBMITTED, DEPLOYED — live demo: https://cliniclink.vercel.app**
 
 Nothing new. Something missing.
 
