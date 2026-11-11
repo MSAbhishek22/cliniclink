@@ -1,7 +1,7 @@
 """ClinicLink demo server — Python standard library only.
 
 Run:  python3 server.py            (listens on 127.0.0.1:8000)
-      CLINICLINK_PORT=8000 CLINICLINK_DB=cliniclink.db python3 server.py
+       CLINICLINK_PORT=8000 CLINICLINK_DB=cliniclink.db python3 server.py
 
 Endpoints:
   GET  /health                 -> service status, synthetic-only flag
@@ -16,10 +16,11 @@ Endpoints:
   POST /api/seed               -> loads synthetic demo records (labelled)
 
 No secrets, no real health data, no external API calls, no paid service.
-Deploy note (NOT done here): Render free tier, `python3 server.py`, with
-PORT supplied by Render — see render.yaml. Free services sleep after
-inactivity, so judges should expect a ~60s cold start; the demo video
-shows the warm path.
+Deploy note: Render free tier (see render.yaml) asks for a card at deploy
+time, so the live demo runs on Vercel Hobby instead (see vercel.json and
+api/index.py). Vercel functions are ephemeral and the deployed filesystem
+is read-only, so SQLite lives in /tmp and filed visits are visible only
+while an instance stays warm.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -62,86 +64,104 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # keep demo output quiet
         pass
 
-    # -- helpers ---------------------------------------------------------
-    def _send(self, status: int, payload: dict) -> None:
-        body = json.dumps(payload).encode()
-        self.send_response(status)
+    def _send(self, payload, code=200):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if not length:
+    def _read_json(self):
+        size = int(self.headers.get("Content-Length") or 0)
+        if not size:
             return {}
         try:
-            data = json.loads(self.rfile.read(length))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+            return json.loads(self.rfile.read(size) or b"{}")
+        except (json.JSONDecodeError, ValueError):
             return {}
-        return data if isinstance(data, dict) else {}
 
     def _paired(self) -> bool:
         return PAIRING.is_paired(self.headers.get("X-Pairing-Token"))
 
-    # -- routes ----------------------------------------------------------
+    def _restore_path(self):
+        # Vercel rewrites every route to /api/index, so the handler sees
+        # "/api/index?path=<original>" instead of the real path. The
+        # rewrite in vercel.json carries the original path in the query
+        # string; locally (python3 server.py) there is no rewrite and
+        # self.path already is the real path.
+        if self.path.startswith("/api/index"):
+            original = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query
+            ).get("path", [""])[0]
+            self.path = "/" + original if original else "/"
+
     def do_GET(self):
+        self._restore_path()
         if self.path in ("/", "/index.html"):
-            page = (STATIC / "index.html").read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(page)))
+            data = (STATIC / "index.html").read_bytes()
+            self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(page)
+            self.wfile.write(data)
         elif self.path == "/health":
-            self._send(200, {"status": "ok", "service": "cliniclink",
-                             "version": "0.1.0", "synthetic_only": True,
-                             "diagnosis": "never"})
+            self._send(
+                {
+                    "status": "ok",
+                    "service": "cliniclink",
+                    "version": "0.1.0",
+                    "synthetic_only": True,
+                    "diagnosis": "never",
+                }
+            )
         elif self.path == "/api/danger-signs":
-            self._send(200, {"danger_signs": DANGER_SIGNS})
+            self._send({"danger_signs": list(DANGER_SIGNS)})
         elif self.path == "/api/visits":
-            self._send(200, {"visits": STORE.list_all()})
+            self._send({"visits": [v.as_dict() for v in STORE.list_all()]})
         elif self.path == "/api/summary":
-            self._send(200, STORE.summary())
+            self._send(STORE.summary())
         else:
-            self._send(404, {"error": "not found"})
+            self._send({"error": "not found"}, 404)
 
     def do_POST(self):
+        self._restore_path()
         body = self._read_json()
-        try:
-            if self.path == "/api/pair/request":
-                self._send(200, PAIRING.request(body.get("device_id", "")))
-            elif self.path == "/api/pair/approve":
-                self._send(200, PAIRING.approve(
-                    body.get("device_id", ""), body.get("approval_code", "")))
-            elif self.path == "/api/pair/revoke":
-                token = body.get("pairing_token", "")
-                self._send(200, {"revoked": PAIRING.revoke(token)})
-            elif self.path == "/api/seed":
-                filed = [STORE.add(structure_note(**rec))
-                         for rec in SYNTHETIC_SEED]
-                self._send(200, {"seeded": len(filed), "visits": filed})
-            elif self.path == "/api/visits":
-                if not self._paired():
-                    self._send(401, {"error": "pairing required: approve a"
-                                        " pairing first, then send"
-                                        " X-Pairing-Token"})
-                    return
+
+        if self.path == "/api/pair/request":
+            result = PAIRING.request(body.get("device_id") or "")
+            return self._send(result, 201 if "approval_code" in result else 400)
+
+        if self.path == "/api/pair/approve":
+            result = PAIRING.approve(body.get("device_id") or "", body.get("approval_code") or "")
+            return self._send(result, 200 if "pairing_token" in result else 400)
+
+        if self.path == "/api/pair/revoke":
+            return self._send({"revoked": PAIRING.revoke(body.get("pairing_token") or "")})
+
+        if self.path == "/api/seed":
+            filed = [STORE.add(structure_note(**rec)) for rec in SYNTHETIC_SEED]
+            return self._send({"seeded": len(filed), "visits": filed})
+
+        if self.path == "/api/visits":
+            if not self._paired():
+                return self._send({"error": "not paired"}, 401)
+            try:
                 report = structure_note(
-                    body.get("worker_id", ""), body.get("household", ""),
-                    body.get("visit_type", ""), body.get("note", ""),
-                    body.get("danger_signs", []))
-                self._send(201, STORE.add(report))
-            else:
-                self._send(404, {"error": "not found"})
-        except ValueError as exc:
-            self._send(400, {"error": str(exc)})
+                    body.get("worker_id") or "",
+                    body.get("household") or "",
+                    body.get("visit_type") or "",
+                    body.get("note") or "",
+                    body.get("danger_signs") or [],
+                )
+            except ValueError as exc:
+                return self._send({"error": str(exc)}, 400)
+            return self._send(STORE.add(report), 201)
+
+        return self._send({"error": "not found"}, 404)
 
 
-def main() -> None:
-    # Render supplies PORT; locally fall back to CLINICLINK_PORT or 8000.
-    # Binding 0.0.0.0 is required on Render; locally it is still reached
-    # at http://127.0.0.1:<port>.
+def main():
     port = int(os.environ.get("PORT", os.environ.get("CLINICLINK_PORT", "8000")))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"ClinicLink demo on port {port}  (synthetic data only)")
