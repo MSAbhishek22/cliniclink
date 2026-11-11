@@ -139,7 +139,7 @@ handling, no secrets).
 | `GET /api/summary` | — | Today's clinic summary |
 | `POST /api/seed` | — | Load 3 labelled synthetic demo records |
 
-## Deploy path (on paper — not done, now deploy-ready)
+## Deploy path (live on Vercel Hobby; Render config kept as alternative)
 
 Render free tier, `python3 server.py`, via `render.yaml` (plan: free,
 `healthCheckPath: /health`, stdlib-only `requirements.txt`, server
