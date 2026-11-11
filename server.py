@@ -118,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/danger-signs":
             self._send({"danger_signs": list(DANGER_SIGNS)})
         elif self.path == "/api/visits":
-            self._send({"visits": [v.as_dict() for v in STORE.list_all()]})
+            self._send({"visits": STORE.list_all()})
         elif self.path == "/api/summary":
             self._send(STORE.summary())
         else:
