@@ -40,7 +40,7 @@ HERE = Path(__file__).parent
 STATIC = HERE / "static"
 
 PAIRING = PairingStore()
-STORE = VisitStore(os.environ.get("CLINICLINK_DB", "cliniclink.db"))
+STORE = VisitStore(os.environ.get("CLINICLINK_DB") or ("/tmp/cliniclink.db" if os.environ.get("VERCEL") else "cliniclink.db"))
 
 # Clearly synthetic demo households. No real person is represented here.
 SYNTHETIC_SEED = [
