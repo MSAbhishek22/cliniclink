@@ -1,3 +1,17 @@
+<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:1f6feb,100:8957e5&height=190&section=header&text=ClinicLink&fontSize=44&fontColor=ffffff&animation=fadeIn&desc=Clinic%20visit%20filing%20%E2%80%94%20private%20by%20design%2C%20approval%20first&descSize=16"/>
+
+> **📖 The Story** Clinic paperwork runs on paper, phone calls and trust — and patient data pays the price when filing goes digital carelessly. ClinicLink, built for Code for a Billion / Bharat Agentic-AI (Health track), files clinic visits using synthetic data, pairing a phone UI with a clinic UI only after an explicit approval.
+>
+> **🎯 The Problem** Small clinics need digital visit records without exposing real patient data to a demo, a database leak, or an accidental pairing.
+>
+> **👥 Who It's For** Clinics and the patients they serve, in settings where the front desk is the entire IT department.
+>
+> **🔑 The USP** Synthetic-data visit filing with approval-gated pairing between the phone and the clinic — nothing pairs, and nothing files, without a human saying yes.
+>
+> **🚀 What's Next** A live deployment once the pending release steps are complete.
+
+---
+
 # ClinicLink — evening transcription → minute-in escalation
 
 **Code for a Billion — Bharat Agentic-AI Hackathon 2026 · Impact area: Health
